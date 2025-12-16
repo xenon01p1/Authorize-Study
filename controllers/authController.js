@@ -1,18 +1,18 @@
 import bcrypt from "bcrypt";
 import db from "../connect.js";
 import { createAccessToken, createRefreshToken, validateRefreshToken } from "../utils/jwt.js";
+import { loginSchema, registerSchema, refreshTokenSchema } from "../schemas/authSchema.js";
 
 export const login = async (req, res) => {
-    const { username, password } = req.body;
+    const { error, value } = loginSchema.validate(req.body)
 
-    if (!username) return res.status(400).json({ message: "Username is undefined." });
-    if (!password) return res.status(400).json({ message: "Password is undefined." });
+    if (error) return res.status(400).json({ message: error.details[0].message });
 
     try {
-        const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [ username ]);
+        const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [ value.username ]);
         const user = rows[0];
 
-        const match = bcrypt.compare(password, user.password);
+        const match = bcrypt.compare(value.password, user.password);
         if (!match) return res.status(400).json({ message: "Wrong password" });
 
         const accessToken = createAccessToken(user.id);
@@ -38,16 +38,17 @@ export const login = async (req, res) => {
 
 export const register = async (req, res) => {
     try {
-        const { roleId, username, password } = req.body;
+        const { error, value } = registerSchema.validate(req.body);
 
-        if (!roleId) return res.status(400).json({ message: "Role ID is undefined." });
-        if (!username) return res.status(400).json({ message: "Username is undefined." });
-        if (!password) return res.status(400).json({ message: "Password is undefined." });
+        if (error) return res.status(400).json({ message: error.details[0].message });
 
-        const hashedPass = await bcrypt.hash(password, 12);
-
+        const hashedPass = await bcrypt.hash(value.password, 12);
         const sql = "INSERT INTO users (role_id, username, password) VALUES (?, ?, ?)";
-        const insertVal = [roleId, username, hashedPass];
+        const insertVal = [
+            value.roleId, 
+            value.username, 
+            hashedPass
+        ];
 
         await db.query(sql, insertVal);
 
@@ -70,20 +71,22 @@ export const register = async (req, res) => {
 };
 
 export const refreshToken = async (req, res) => {
-    const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ message: "Refresh token is undefined." });
+    const { error, value } = refreshTokenSchema.validate(req.body);
+
+    if (error) return res.status(400).json({ message: error.details[0].message });
 
     // validate token
     let payload;
     try {
-        payload = validateRefreshToken(refreshToken);
+        payload = validateRefreshToken(value.refreshToken);
     } catch (err) {
         return res.status(403).json({ message: "Invalid refresh token." })
     }
 
     try {
-        const selectVal = [ payload.id, refreshToken];
-        const selectSql = "SELECT * FROM users WHERE id = ? AND refresh_token";
+        // check if payload refresh token and db refresh token are the same
+        const selectVal = [ payload.id, value.refreshToken];
+        const selectSql = "SELECT * FROM users WHERE id = ? AND refresh_token = ?";
         const [rows] = await db.query(selectSql, selectVal);
 
         // generate new token
