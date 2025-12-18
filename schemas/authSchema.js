@@ -6,7 +6,6 @@ export const loginSchema = joi.object({
 });
 
 export const registerSchema = joi.object({
-    roleId: joi.number().positive().required(),
     username: joi.string().required(),
     password: joi.string().required()
 });

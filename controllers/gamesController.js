@@ -56,7 +56,11 @@ export const updateGames = async (req, res) => {
             value.rating,
             id
         ];
-        await db.query(updateSql, updateVal);
+        const [result] = await db.query(updateSql, updateVal);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Game not found." });
+        }
 
         return res.status(200).json({ message: "Update successful!" });
     } catch (err) {
@@ -67,12 +71,17 @@ export const updateGames = async (req, res) => {
 export const deleteGames = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!id) return res.status(200).json({ message: "Parameter 'id' is not defined" });
+        if (!id) return res.status(400).json({ message: "Parameter 'id' is not defined" });
 
         const deleteSql = "DELETE FROM games WHERE id = ?";
         const deleteVal = [ id ];
 
-        await db.query(deleteSql, deleteVal);
+        const [result] = await db.query(deleteSql, deleteVal);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Game not found." });
+        }
+
         return res.status(200).json({ message: "Successfully deleted game!" });
         
     } catch (err) {

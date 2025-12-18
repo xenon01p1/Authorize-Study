@@ -3,12 +3,12 @@ import jwt from "jsonwebtoken";
 const ACCESS_SECRET = "YouDUmbass";
 const REFRESH_SECRET = "I'm Suicidal";
 
-export const createAccessToken = (userId) => {
-    return jwt.sign({id: userId}, ACCESS_SECRET, { expiresIn: "5m" });
+export const createAccessToken = (userId, permissions) => {
+    return jwt.sign({id: userId, permissions}, ACCESS_SECRET, { expiresIn: "5m" });
 }
 
 export const createRefreshToken = (userId) => {
-    return jwt.sign({id: userId}, REFRESH_SECRET, { expiresIn: "5m" });
+    return jwt.sign({id: userId}, REFRESH_SECRET, { expiresIn: "7d" });
 }
 
 export const validateAccessToken = (token) => {

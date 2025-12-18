@@ -2,39 +2,28 @@ import bcrypt from "bcrypt";
 import db from "../connect.js";
 import { createAccessToken, createRefreshToken, validateRefreshToken } from "../utils/jwt.js";
 import { loginSchema, registerSchema, refreshTokenSchema } from "../schemas/authSchema.js";
+import authService from "../services/authServices.js";
 
 export const login = async (req, res) => {
-    const { error, value } = loginSchema.validate(req.body)
-
-    if (error) return res.status(400).json({ message: error.details[0].message });
-
-    try {
-        const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [ value.username ]);
-        const user = rows[0];
-
-        const match = bcrypt.compare(value.password, user.password);
-        if (!match) return res.status(400).json({ message: "Wrong password" });
-
-        const accessToken = createAccessToken(user.id);
-        const refreshToken = createRefreshToken(user.id);
-        const updateVal = [ refreshToken, user.id ];
-
-        await db.query("UPDATE users SET refresh_token = ? WHERE id = ?", updateVal);
-
-        return res
-            .status(200)
-            .json({
-                message: "Login successfull",
-                accessToken,
-                refreshToken,
-                role: user.role_id
-            });
-
-    } catch (err) {
-        return res.status(500).json({ message: err.message });
+    const { error, value } = loginSchema.validate(req.body);
+    if (error) {
+        return res.status(400).json({ message: error.details[0].message });
     }
 
-}
+    try {
+        const tokens = await authService.login(value);
+        return res.status(200).json({
+            message: "Login successful",
+            ...tokens
+        });
+    } catch (err) {
+        if (err.message === "INVALID_CREDENTIALS") {
+            return res.status(400).json({ message: "Invalid username or password" });
+        }
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
 
 export const register = async (req, res) => {
     try {
@@ -43,16 +32,15 @@ export const register = async (req, res) => {
         if (error) return res.status(400).json({ message: error.details[0].message });
 
         const hashedPass = await bcrypt.hash(value.password, 12);
-        const sql = "INSERT INTO users (role_id, username, password) VALUES (?, ?, ?)";
+        const sql = "INSERT INTO users (username, password) VALUES (?, ?)";
         const insertVal = [
-            value.roleId, 
             value.username, 
             hashedPass
         ];
 
         await db.query(sql, insertVal);
 
-        return res.status(200).json({
+        return res.status(201).json({
             message: "Register successful. Please log in with your new account.",
         });
 
@@ -70,6 +58,8 @@ export const register = async (req, res) => {
     }
 };
 
+// note : refresh token doesn't need permission 
+// because it's for refresh token doesn't need permission
 export const refreshToken = async (req, res) => {
     const { error, value } = refreshTokenSchema.validate(req.body);
 
@@ -89,9 +79,29 @@ export const refreshToken = async (req, res) => {
         const selectSql = "SELECT * FROM users WHERE id = ? AND refresh_token = ?";
         const [rows] = await db.query(selectSql, selectVal);
 
+        if (rows.length === 0) {
+            return res.status(403).json({
+                message: "Refresh token has been revoked or is no longer valid."
+            });
+        }
+
+        // get permission
+        const [permissionsRows] = await db.query(`
+            SELECT p.name 
+            FROM users_roles ur
+            JOIN role_permissions rp ON rp.role_id = ur.role_id 
+            JOIN permissions p ON p.id = rp.permission_id 
+            WHERE ur.user_id = ?
+        `, [ payload.id ]);
+
+        // Transform the array of objects into the format you want
+        const permissions = {
+            permissions: permissionsRows.map(row => row.name)
+        };
+
         // generate new token
-        const newAccessToken = createAccessToken(payload.id);
-        const newRefreshToken = createAccessToken(payload.id);
+        const newAccessToken = createAccessToken(payload.id, permissions);
+        const newRefreshToken = createRefreshToken(payload.id);
 
         // update user to have new token
         const updateSql = "UPDATE users SET refresh_token = ? WHERE id = ?";
