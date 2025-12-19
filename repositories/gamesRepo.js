@@ -1,17 +1,17 @@
 import db from "../connect.js";
 
-export const findAllGames = async () => {
+const findAllGames = async () => {
     const [rows] = await db.query("SELECT * FROM games");
     return rows;
 }
 
-export const insertGame = async (data) => {
+const insertGame = async (data) => {
     const insertSql = "INSERT INTO games (title, genre, rating) VALUES (?, ?, ?)";
     const [result] = await db.query(insertSql, data);
     return result;
 }
 
-export const updateGame = async (data) => {
+const updateGame = async (data) => {
     const updateSql = `
         UPDATE games
         SET
@@ -24,8 +24,15 @@ export const updateGame = async (data) => {
     return result;
 }
 
-export const deleteGame = async (data) => {
+const deleteGame = async (data) => {
     const deleteSql = "DELETE FROM games WHERE id = ?";
     const [result] = await db.query(deleteSql, data);
     return result;
+}
+
+export default {
+    findAllGames,
+    insertGame,
+    updateGame,
+    deleteGame
 }

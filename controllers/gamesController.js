@@ -1,10 +1,11 @@
 import db from "../connect.js";
 import { newGameSchema, updateGameSchema } from "../schemas/gamesSchema.js";
+import gamesServices from "../services/gamesServices.js";
 
 export const getGames = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM games");
-        return res.status(200).json({ message: "Fetching data successful!", data: rows });
+        const data = await gamesServices.getAllGames();
+        return res.status(200).json({ message: "Fetching data successful!", data });
     } catch (err) {
         return res.status(500).json({ message: err.message })
     }
@@ -16,16 +17,11 @@ export const newGames = async (req, res) => {
     if (error) return res.status(400).json({ message: error.details[0].message });
 
     try {
-        const insertVal = [
-            value.title,
-            value.genre,
-            value.rating
-        ];
-        const insertSql = "INSERT INTO games (title, genre, rating) VALUES (?, ?, ?)";
-        await db.query(insertSql, insertVal);
+        
+        await gamesServices.newGameService(value.title, value.genre, value.rating);
 
         return res
-            .status(200)
+            .status(201)
             .json({
                 message: "Insert games successful!"
             });
@@ -42,28 +38,16 @@ export const updateGames = async (req, res) => {
 
         if (!id) return res.status(400).json({ message: "Parameter 'id' is not defined" });
         if (error) return res.status(400).json({ message: error.details[0].message });
-
-        const updateSql = `UPDATE games
-            SET
-                title = COALESCE(?, title),
-                genre = COALESCE(?, genre),
-                rating = COALESCE(?, rating)
-            WHERE id = ?
-        `;
-        const updateVal = [
-            value.title,
-            value.genre,
-            value.rating,
-            id
-        ];
-        const [result] = await db.query(updateSql, updateVal);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Game not found." });
-        }
+        
+        await gamesServices.updateGameService(value.title, value.genre, value.rating, id);
 
         return res.status(200).json({ message: "Update successful!" });
+
     } catch (err) {
+        if (err.code === "NOT_FOUND") {
+            return res.status(404).json({ message: err.message });
+        }
+
         return res.status(500).json({ message: err.message });
     }
 }
@@ -73,18 +57,15 @@ export const deleteGames = async (req, res) => {
         const { id } = req.params;
         if (!id) return res.status(400).json({ message: "Parameter 'id' is not defined" });
 
-        const deleteSql = "DELETE FROM games WHERE id = ?";
-        const deleteVal = [ id ];
-
-        const [result] = await db.query(deleteSql, deleteVal);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Game not found." });
-        }
+        await gamesServices.deleteGameService(id);
 
         return res.status(200).json({ message: "Successfully deleted game!" });
         
     } catch (err) {
+        if (err.code === "NOT_FOUND") {
+            return res.status(404).json({ message: err.message });
+        }
+        
         return res.status(500).json({ message: err.message })
     }
 }
