@@ -13,7 +13,7 @@ export const checkAuthMiddleware = (req, res, next) => {
 
     try {
         const decoded = validateAccessToken(token);
-        req.user = decoded;
+        req.user = decoded; // {id, permissions}
         next();
     } catch (err) {
         return res.status(403).json({ message: "Invalid token." });

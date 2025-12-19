@@ -4,6 +4,9 @@ import gamesServices from "../services/gamesServices.js";
 
 export const getGames = async (req, res) => {
     try {
+        if (!req.user.permissions.includes("games.read")) 
+            return res.status(403).json({ message: "You have no permission." });
+
         const data = await gamesServices.getAllGames();
         return res.status(200).json({ message: "Fetching data successful!", data });
     } catch (err) {
@@ -13,8 +16,10 @@ export const getGames = async (req, res) => {
 
 export const newGames = async (req, res) => {
     const { error, value } = newGameSchema.validate(req.body);
-
     if (error) return res.status(400).json({ message: error.details[0].message });
+
+    if (!req.user.permissions.includes("games.add")) 
+        return res.status(403).json({ message: "You have no permission." });
 
     try {
         
@@ -38,6 +43,9 @@ export const updateGames = async (req, res) => {
 
         if (!id) return res.status(400).json({ message: "Parameter 'id' is not defined" });
         if (error) return res.status(400).json({ message: error.details[0].message });
+
+        if (!req.user.permissions.includes("games.edit")) 
+            return res.status(403).json({ message: "You have no permission." });
         
         await gamesServices.updateGameService(value.title, value.genre, value.rating, id);
 
@@ -57,6 +65,9 @@ export const deleteGames = async (req, res) => {
         const { id } = req.params;
         if (!id) return res.status(400).json({ message: "Parameter 'id' is not defined" });
 
+        if (!req.user.permissions.includes("games.delete")) 
+            return res.status(403).json({ message: "You have no permission." });
+
         await gamesServices.deleteGameService(id);
 
         return res.status(200).json({ message: "Successfully deleted game!" });
@@ -65,7 +76,7 @@ export const deleteGames = async (req, res) => {
         if (err.code === "NOT_FOUND") {
             return res.status(404).json({ message: err.message });
         }
-        
+
         return res.status(500).json({ message: err.message })
     }
 }
